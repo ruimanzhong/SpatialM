@@ -1,5 +1,6 @@
-
+source('check.r')
 Mesh = function(bd.sf,max.edge = c(0.7, 0.7),cut.off = 0.25,offset = c(-0.05, -0.05)){
+  check_mesh(bd.sf)
   bd.sp = as(bd.sf,Class = 'Spatial')
   inla.mesh.2d(boundary = bd.sp,
                max.edge = max.edge, cutoff = cutoff,
