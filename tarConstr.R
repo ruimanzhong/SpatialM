@@ -1,6 +1,13 @@
-#**************construct Prediction Area**********
+#' Target Area Construction
+#' 
+#' @param pre.sf A sf obj of the boundary of the area target area
+#' @param cell.x A number to generate cells in the target area
+#' @param cell.y A number to generate cells in the target area 
+#' @param proN A number that gives a way to project the location. By default is 4326, which is WG84
+#' @return A sf obj of target area 
 
-area.pre = function(pre.sf, cell.x, cell.y, proN) {
+
+area.pre = function(pre.sf, cell.x, cell.y, proN = 4326) {
   
   pre.sf = st_transform(pre.sf, proN)
   bb = unname(attributes(st_geometry(pre.sf))$bbox)
