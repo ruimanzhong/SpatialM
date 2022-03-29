@@ -1,7 +1,7 @@
-areal = function(formula, area.sf, area.pre, mesh, spde, proN) {
+areal = function(formula, area.sf, target, areaPre.sf = NULL, mesh, spde, proN) {
 
   
-  locin_pred = st_join(area.pre, area.sf, left = F)
+  locin_pred = st_join(target, area.sf, left = F)
   
   # Projection Matrix
   meshcoo = data.frame(long = mesh$loc[,1], lat = mesh$loc[,2] )
@@ -19,7 +19,7 @@ areal = function(formula, area.sf, area.pre, mesh, spde, proN) {
                          )
   
   Apred = inla.spde.make.A (mesh = mesh, 
-                            loc = as.matrix (st_coordinates(area.pre[,1]) 
+                            loc = as.matrix (st_coordinates(target[,1]) 
                                              ) 
                             )
   
@@ -33,7 +33,7 @@ areal = function(formula, area.sf, area.pre, mesh, spde, proN) {
                  )
              )
   
-  return(pred(res, stk.full, area.pre))
+  return(pred(res,stk.full,target,areaPre.sf,proN))
 }
 
 stack.full.areal = function(Aa, Apred, area.sf, locin_pred, spde) {

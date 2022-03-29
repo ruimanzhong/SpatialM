@@ -69,3 +69,17 @@ check_projM = function(Aa, AP){
   
   
 }
+
+check_pre = function(bd.sf =  NULL,pre.sf = NULL, pre.p = NULL, 
+                     cell.x = NULL, cell.y = NULL, proN = 4326) {
+  
+  if (sum(is.null(bd.sf,pre.sf,pre.p)) != 2)
+    stop("'bd.sf' is for surface prediction, 'pre.sf' is for areal prediction, and 
+         'pre.p' is for point prediction, input one and only one of them")
+  if(is.null(bd.sf) == F && (is.null(cell.x) == T |is.null(cell.y == T) ))
+    stop("'bd.sf' is for surface prediction, 'cell.x' and 'cell.y' must be numbers to construct grids")
+  if (is.null(pre.sf) == F ||  class(pre.sf)[[1]] != 'sf') 
+    stop("'Valid predict area input required, ‘pre.sf’ should be sf class'")
+  if (is.null(pre.p) == F ||  class(pre.p)[[1]] != 'sf') 
+    stop("'Valid predict point input required, ‘pre.p’ should be sf class'")
+}

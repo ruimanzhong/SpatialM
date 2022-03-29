@@ -14,10 +14,8 @@ source('check.r')
 source('dwscalerv2.R')
 source('tarConstr.R')
 source('meld_v3.R')
+source('prediction.R')
 
-bd.sf <- geoboundaries("United Kingdom")
-
-pre.sf = bd.sf
 cutoff = 0.25
 max.edge = c(0.7, 0.7)
 offset = c(-0.05, -0.05)
@@ -56,34 +54,64 @@ colnames(area.sf) = c('value.a','geometry')
 
 ggplot(data = p.sf$geometry) + geom_sf()
 
-mesh = Mesh(bd.sf, max.edge, cut.off = 0.1, offset)
+mesh = Mesh(area.sf,offset =c(-0.05,-0.05), cut.off = 0.1)
 
 plot(mesh)
 
-area.pre = area.pre(pre.sf, cell.x, cell.y, proN = proN)
+#  require a continuous surface 
 
-# the output contain two elements, one is estimated mean and confidence interval by col
-# another is the same results but organized by row
+area.pre = target(pre.sf = area.sf, cell.x =cell.x,cell.y =  cell.y, proN = proN)
 
-a = dwscaler.spde (mesh, area.pre, 
-                   prior.range = c(2, 0.01), 
-                   prior.sigma = c(10, 0.01), 
-                   p.sf, area.sf)
+# if only want to predict point data, no need for target function 
+
+
+a = dwscaler.spde (mesh = mesh, target = area.pre, areaPre.sf = NULL,
+                   prior.range = c(2, 0.01), prior.sigma = c(10, 0.01),
+                   p.sf = p.sf, area.sf = area.sf)
 
  
 formula = y ~ 0 + b0 + f(s, model = spde) 
 
 b_1 = meld(formula =formula, mesh = mesh,
-         p.sf = p.sf, area.pre = area.pre, 
+         p.sf = p.sf, target = area.pre, 
          prior.range = c(2, 0.01), prior.sigma = c(10, 0.01))
 
 b_2 = meld(formula =formula, 
            mesh = mesh, p.sf = NULL,
            area.sf = area.sf,
-           area.pre = area.pre,
+           target = area.pre,
            prior.range = c(2, 0.01),prior.sigma = c(10, 0.01))
 
 c = meld(formula =formula,
-         mesh = mesh, area.pre = area.pre,
+         mesh = mesh, target = area.pre,
          p.sf = p.sf,area.sf = area.sf,
-         prior.range = c(2, 0.01),prior.sigma = c(10, 0.01),proN = proN)
+         prior.range = c(2, 0.01),prior.sigma = c(10, 0.01), proN = proN)
+
+######### aggregation ##############
+
+ fa = 100
+ra <- raster:: aggregate(rr, fact = fa, fun = mean)
+spol<-rasterToPolygons(ra, dissolve = F)
+block = st_as_sf(spol)
+st_transform(block, proN)
+colnames(block) = c('value.a','geometry')
+
+a_blcok = dwscaler.spde (mesh = mesh, target = area.pre, areaPre.sf = block,
+                   prior.range = c(2, 0.01), prior.sigma = c(10, 0.01),
+                   p.sf = p.sf, area.sf = area.sf)
+
+# compare surface and block
+plot(block)
+group = block$geometry
+plot(a)
+pre.group = aggregate(a, group, mean)
+
+plot(pre.group)
+
+m = st_join(a, block,left = F)
+n =  st_join(block, a,left = F)
+
+plot(group)
+coo = as.matrix(st_coordinates(a[,1]))
+points(coo, col = "red")
+

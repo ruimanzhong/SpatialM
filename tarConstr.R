@@ -6,21 +6,25 @@
 #' @param proN A number that gives a way to project the location. By default is 4326, which is WG84
 #' @return A sf obj of target area 
 
-
-area.pre = function(pre.sf, cell.x, cell.y, proN = 4326) {
+source('check.r')
+target = function( bd.sf = NULL, pre.sf = NULL, cell.x = NULL, 
+                   cell.y = NULL,  proN = 4326) {
   
-  pre.sf = st_transform(pre.sf, proN)
-  bb = unname(attributes(st_geometry(pre.sf))$bbox)
+  if(is.null(pre.sf) == F && is.null(bd.sf) == T) {
+    bd.sf = st_as_sf(st_union(pre.sf))
+  }
+
+  bd.sf = st_transform(bd.sf, proN)
+  bb = unname(attributes(st_geometry(bd.sf))$bbox)
   x = seq(bb[1] - 1, bb[3] + 1, length.out = cell.x)
   y = seq(bb[2] - 1, bb[4] + 1, length.out = cell.y)
   coop = expand.grid(x, y)
   coop_sf = sf::st_as_sf(coop, coords = c('Var1','Var2'), crs = proN)
   
-  pre.sf = pre.sf%>%
-  st_set_crs(proN)
+  target = coop_sf %>% 
+    st_join(bd.sf, left = FALSE)
   
-  return(
-  coop_sf %>% 
-    st_join(pre.sf, left = FALSE)
-  )
+  return(target)
+  
+  
 }

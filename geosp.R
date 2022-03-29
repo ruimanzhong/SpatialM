@@ -1,13 +1,13 @@
-geosp = function(formula,mesh,p.sf,area.pre,spde){
+geosp = function(formula, mesh, p.sf, target, areaPre.sf = NULL, spde, proN = 4326){
   # Projection Matrix
   Ap = inla.spde.make.A(mesh , as.matrix(st_coordinates(p.sf[,1]))[,c(1,2)])
-  Apre = inla.spde.make.A(mesh = mesh, loc = as.matrix (st_coordinates(area.pre[,1])))
+  Apre = inla.spde.make.A(mesh = mesh, loc = as.matrix (st_coordinates(target[,1])))
   
   # construct stack
   indexs = inla.spde.make.index("s", spde$n.spde)
   
   #construct stack
-  stk.full = stack.full.geo(Ap,Apre,p.sf,area.pre,indexs)
+  stk.full = stack.full.geo(Ap,Apre,p.sf,target,indexs)
   
   #estimation and prediction
   res <- inla(formula,
@@ -18,12 +18,12 @@ geosp = function(formula,mesh,p.sf,area.pre,spde){
               ))
   
   #prediction data frame
-return(pred(res,stk.full,area.pre)) 
+return(pred(res,stk.full,target,areaPre.sf,proN)) 
 }
 
 #*************Construct stack*********************
 #*
-stack.full.geo = function(Ap,Apre,p.sf,area.pre,indexs){
+stack.full.geo = function(Ap,Apre,p.sf,target,indexs){
   stk.e <- inla.stack(
   tag = "est",
   data = list(y = p.sf$value),
@@ -36,7 +36,7 @@ stk.p <- inla.stack(
   tag = "pred",
   data = list(y = NA),
   A = list(1, Apre),
-  effects = list(data.frame(b0 = rep(1, nrow(st_coordinates(area.pre[,1])))), s = indexs)
+  effects = list(data.frame(b0 = rep(1, nrow(st_coordinates(target[,1])))), s = indexs)
 )
 
 return (inla.stack(stk.e, stk.p))
