@@ -29,7 +29,7 @@ cell.y =50
 
 # point data, load the data when wd is on data
 setwd("~/Documents/Project 1/data")
-
+bd.sf = geoboundaries("United Kingdom")
 st_transform(bd.sf, proN)
 p.df = read.csv("2016PM2.5_avg.csv")
 p.df = p.df[,c(2,3,4)]
@@ -50,8 +50,8 @@ ra <- raster:: aggregate(rr, fact = fa, fun = mean)
 spol<-rasterToPolygons(ra, dissolve = F)
 area.sf = st_as_sf(spol)
 st_transform(area.sf, proN)
-colnames(area.sf) = c('value.a','geometry')
-
+colnames(area.sf) = c('avalue','geometry')
+st_write(area.sf, paste0(getwd(), "/", "dearea.shp"), delete_layer = TRUE) 
 ggplot(data = p.sf$geometry) + geom_sf()
 
 mesh = Mesh(area.sf,offset =c(-0.05,-0.05), cut.off = 0.1)
