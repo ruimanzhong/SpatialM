@@ -1,4 +1,5 @@
-fnCheckInputsMelding = function(depoint, dearea, dppoint, dparea) {
+fnCheckInputsMelding = function(depoint, dearea, dppoint, dparea, bd) {
+  # check inputs data
   
   if (is.null(dearea) == T && is.null(depoint) == T) stop("'Valid estimation data input required'")
   if (is.null(dparea) == T && is.null(dppoint) == T) stop("'Valid preidction data input required'")
@@ -22,4 +23,12 @@ fnCheckInputsMelding = function(depoint, dearea, dppoint, dparea) {
   if(is.null(dppoint) == F && sum(c(st_crs(dppoint) == st_crs(depoint),st_crs(dppoint) == st_crs(dearea))) == 0){
     stop('all the input data must have the same crs, use st_crs() to check your data')
   }
+  
+  if( !class(bd)[1] %in% c("sf", "NULL") ){stop("boundary should be null or 'sf' obj")}
+  if(is.null(dearea) == F && nrow(dparea) !=  nrow(st_join(dparea,bd)))
+    stop("predicted area should be within boundary")
+
+  
+  if(is.null(dppoint) == F && nrow(dppoint) !=  nrow(st_join(dppoint,bd))) stop("predicted area should be within boundary")
 }
+

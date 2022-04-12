@@ -1,0 +1,134 @@
+---
+title: "V"
+output: pdf_document
+---
+
+```{r include=FALSE}
+packages = c('raster','rgdal',
+             'rnaturalearth',
+             'viridis','rnaturalearthhires','sf','INLA','rgeoboundaries','tidyverse')
+
+package.check = lapply(packages, FUN =function(x){
+  if(!require(x ,character.only = T))
+    install.packages(x)
+  if(!(x %in% ( .packages()  ) ) )
+    library(x ,character.only = T)})
+
+#source('fnPredictMelding.r')
+```
+## Loading data
+'proN' is projection way, here '4326' is WSG84 projection, which is latitude and longitude.
+
+```{r}
+proN = 4326
+```
+Load point data. The point data frame has three colunms, where (x,y) contians sptial information of the data and the variable pvalue is the PM 2.5 value of the location. After loading the data, we convert data frame to a sf obj.
+```{r warning=FALSE}
+#setwd("~/Documents/Project 1/resources/sptialM")
+p.df = read.csv("pointdata.csv")
+p.df = p.df[,c(2,3,4)]
+colnames(p.df)<-c('pvalue','y','x')
+
+depoint = p.df %>%
+  st_as_sf(coords = c("x", "y"), dim = "XY") %>% 
+  st_set_crs(proN) %>%
+  st_cast("MULTIPOINT")
+
+head(depoint)
+```
+
+Next step is to load areal data. The areal data is a shapefile in folder arealdata. Load the data as a sf obj. If your data are not shapefile (e.g., raster data, sp data, etc.), you need to transform the data so that them become sf objects. 
+
+```{r warning=FALSE}
+setwd("~/Documents/Project 1/resources/sptialM/arealdata")
+dearea = st_read('dearea.shp')
+ggplot(data = dearea) +
+  geom_sf(aes(fill = avalue))
+```
+### prediction data
+Next step is to create our target. The target can be point data, areal data or continuous surface of an area.  Here we just use the point location and area partition of the input data. But the target point and areal partition can be different as long as you provide the valid parameters. All the target should be sf onjects. 
+```{r}
+dppoint <- depoint
+dparea <- dearea
+```
+The method can also predict a continuous surface. This requires you to create dense points in the target area. One way is to use rgeoboundaries() and grid() function as follows. Here we use UK area as an example. 
+```{r}
+library(rgeoboundaries)
+
+bd = geoboundaries("United Kingdom")
+
+# convert the boundary to your projection mehtod
+bd = st_transform(bd , proN) 
+ggplot(bd) + geom_sf()
+
+bb = unname(attributes(st_geometry(bd))$bbox)
+
+x = seq(bb[1] - 1, bb[3] + 1, length.out = 50)
+y = seq(bb[2] - 1, bb[4] + 1, length.out = 50)
+coop = expand.grid(x, y)
+coop_sf = sf::st_as_sf(coop, coords = c('Var1','Var2'), crs = proN)
+
+# transform matrix data to sf obj
+  target = coop_sf %>% 
+    st_join(bd, left = FALSE)
+  
+ggplot(target) + geom_sf()
+```
+
+## Geostatistical Data Model
+We firstly show how to make prediction using SPDE and Bayesian melding model from point data only. In other words, we won't use our areal inputs. The method is based on SPDE, which needs to construct a mesh before make predictions. We highly recommend users to create their own mesh instead of generating by default. We have a function fnCreateMesh() to help users. 
+
+```{r}
+location = as.matrix(st_coordinates(depoint)[ , c(1,2)])
+mesh = fnCreateMesh(depoint, NULL, bd = bd)
+plot(mesh)
+points(location,col =2)
+```
+
+
+Then we call the function to predict. The predicted mean and predicted interval are obtained. 
+```{r}
+geopre = fnPredictMelding(depoint =  depoint, dearea = NULL, dppoint = dppoint, dparea = NULL, mesh = mesh)
+
+ggplot(data = bd) + geom_sf() + geom_sf(data = geopre[[1]],aes(geometry = geometry,color=pred_mean))+
+   labs(title = "Average Pm 2.5  Level 2016, UK", fill = "PM 2.5")
+ 
+```
+
+## Areal Data Model
+
+Next, we use areal data only to make prediction. Similarly, mesh is first created. When predicting areal data, 
+```{r}
+mesh_area = fnCreateMesh(depoint = NULL,dearea, bd = bd)
+
+arealpre = fnPredictMelding(depoint =  NULL, dearea = dearea, dppoint = NULL, dparea = dparea, mesh = mesh_area)
+
+head(areapre)
+```
+
+```{r}
+ggplot() +
+   geom_sf(data = arealpre [[2]], aes(geometry = geometry, fill = pred_mean)) +
+   geom_sf(data = bd, inherit.aes = FALSE, fill = NA) +
+   scale_fill_viridis() +
+   theme_minimal() +
+   labs(title = "Average Pm 2.5  Level 2016, UK", fill = "PM 2.5")
+```
+
+## Bayesian Melding Model
+
+Finally, we construct a melding model that utilizes both point data and areal data. 
+```{r}
+mesh_meld = fnCreateMesh(depoint = depoint,dearea, bd = bd)
+
+meldpre = fnPredictMelding(depoint =  depoint, dearea = dearea, dppoint = dppoint, dparea = dparea, mesh = mesh_meld)
+```
+
+## Compare performance of the methods
+### Geostatistical Data Model vs. Medling Model
+```{r}
+plot(1:74, geopre[[1]]$pvalue)
+lines(1:74, geopre[[1]]$pred_mean, col = 2)
+lines(1:74, meldpre[[1]]$pred_mean, col = 3)
+legend('bottomright', c('Melding','Geo'),lty = 1, col = c(3,2) )
+```
