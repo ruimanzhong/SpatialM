@@ -1,0 +1,288 @@
+---
+title: "Vignette Melding approach"
+output: pdf_document
+---
+
+```{r include=FALSE}
+packages <- c('raster','rgdal', 'rnaturalearth', 'viridis','rnaturalearthhires',
+              'sf','INLA','rgeoboundaries','tidyverse')
+
+package.check <- lapply(packages, FUN = function(x){
+  if(!require(x ,character.only = T)){install.packages(x)}
+  if(!(x %in% ( .packages()  ) ) ){library(x ,character.only = T)}
+  })
+
+theme_set(theme_minimal())
+options(ggplot2.continuous.colour="viridis")
+options(ggplot2.continuous.fill = "viridis")
+
+```
+
+```{r}
+source("fnCheckInputsMelding.R")
+source("fnCreateMesh.R")
+source("fnPredictMelding.R")
+```
+
+# Specifying the arguments of `fnPredictMelding()`
+
+
+We need to specify the observed point and areal data that will be used for estimation.
+These are `sf` objects called `depoint` with the point data and `dearea` with the areal data.
+
+Then, we need to specify the locations or areas where we want to get predictions. Depending on where we want to predict,
+we would need to specify `sf` objects
+`dppoint` for a set of points and `dparea` for a set of areas.
+
+`dppoint` can be an `sf` object containing a few points or a dense set of regular points within the study region representing a continuous surface
+(`dpcontsurface`).
+
+We also need to specify an `sf` object the boundary of the region of study, `boundaryregion`.
+
+Note that all objects need to be `sf` objects and have the same projection.
+Therefore, if we have `raster` or `sp` data, we need to transform them to `sf` to be able to use the package.
+
+## Specifying the boundary region
+
+
+In this example, we specify the projection as 4326 or WSG84 (latitude and longitude).
+ 
+The region of study is UK. We obtain the boundary of the region of study with the `rgeoboundaries` package and transform it to the chosen projection. 
+
+
+```{r}
+# CRS projection
+crsproj <- 4326
+
+library(rgeoboundaries)
+boundaryregion <- geoboundaries("United Kingdom")
+boundaryregion <- st_transform(boundaryregion , crsproj) 
+
+ggplot(boundaryregion) + geom_sf()
+```
+
+
+## Specifying the observed point and areal data for estimation
+
+
+### Point data for estimation
+
+The observed point data `depoint` is an `sf` object with three columns, namely,
+`x` and `y` with the coordinates of the locations, and `value` with the observed PM2.5 values at the locations.
+
+In our example, point data are in a `.csv` file. After reading the data frame, we convert it to an `sf` object and specify the chosen projection.
+
+
+```{r warning=FALSE}
+depoint <- read.csv("pointdata.csv")
+depoint <- depoint[, c(2, 3, 4)]
+colnames(depoint) <- c('value', 'y', 'x')
+
+depoint <- depoint %>% st_as_sf(coords = c("x", "y"), dim = "XY") %>%
+  st_set_crs(crsproj) %>% st_cast("MULTIPOINT")
+head(depoint)
+
+ggplot(data = boundaryregion) + geom_sf() +
+geom_sf(data = depoint, aes(col = value))
+```
+
+### Areal data for estimation
+
+The areal data `dearea` is an `sf` object with columns XXXX
+
+
+```{r warning=FALSE}
+# TODO. Put name column value not avalue
+
+dearea <- st_read("arealdata/dearea.shp")
+dearea$value <- dearea$avalue
+
+
+ggplot(data = boundaryregion) + geom_sf() +
+geom_sf(data = dearea, aes(fill = value))
+
+
+# Create mask
+# TODO: create better mask. Now some cells are outside the border
+# br <- boundaryregion %>% st_geometry() %>% st_cast('POLYGON') %>% st_union()
+# brbbox <- br %>% st_bbox()
+# brbbox <- brbbox %>% st_as_sfc() %>% st_as_sf()
+# mask <- st_difference(brbbox, br)
+# 
+# ggplot(data = boundaryregion) + geom_sf() +
+# geom_sf(data = dearea, aes(fill = value)) +
+#   geom_sf(data = us_mask, fill = 'white')
+
+```
+
+## Specifying point, areal and continuous surface data for prediction
+
+
+### Point data for prediction
+
+Point data for prediction `dppoint` is an `sf` object with columns XXX.
+
+In this example we use the same point data for prediction and estimation.
+
+```{r}
+dppoint <- depoint
+
+
+ggplot(data = boundaryregion) + geom_sf() +
+geom_sf(data = dppoint)
+```
+
+### Areal data for prediction
+
+
+Areal data for prediction `dparea` is an `sf` object with columns XXX.
+
+In this example we use the same areal data for prediction and estimation.
+
+```{r}
+dparea <- dearea
+
+
+ggplot(data = boundaryregion) + geom_sf() +
+geom_sf(data = dparea)
+```
+
+### Continuous surface for prediciton
+
+If we wish to predict in a continuous surface, we need to provide a dense grid of points within the region of study.
+We can do that by creating a bounding box of the region of study and using `expand.grid()` to create a grid of points within the boundary. 
+
+
+
+
+
+```{r}
+# Bounding box of the boundary of the region of study
+bb <- unname(attributes(st_geometry(boundaryregion))$bbox)
+
+# Grid
+x <- seq(bb[1] - 1, bb[3] + 1, length.out = 50)
+y <- seq(bb[2] - 1, bb[4] + 1, length.out = 50)
+coop <- expand.grid(x, y)
+coop_sf <- sf::st_as_sf(coop, coords = c('Var1','Var2'), crs = crsproj)
+
+ggplot()+geom_sf(data = coop_sf)
+```
+The next step is to remove the point outside of the boundary. Thus, the leaf points are just our target points, which will be `dppoint` in `fnPredictMelding()`. 
+```{r}
+# Transform matrix data to sf objet
+dpcontsurface <- coop_sf %>% st_join(boundaryregion, left = FALSE)
+  
+ggplot(dpcontsurface) + geom_sf()
+
+
+ggplot(data = boundaryregion) + geom_sf() +
+geom_sf(data = dpcontsurface)
+```
+
+## Melding approach with `fnPredictMelding()`
+
+Here we show how to make prediction using the melding approach using point data for estimation only, areal data for estimation only, and both point and areal data for estimation combined.
+Predictions are obtained with the `fnPredictMelding()` function.
+
+The returned value of `fnPredictMelding()` is a list with two objects. points and areas EXPLAIN MORE
+
+
+The melding approach method is based on SPDE approach, which needs to uses a triangulated mesh and priors for the variance and range of the spatial random effect before make predictions.
+It is recommended the user carefully chooses both the mesh and the priors.
+The package provides a function `fnCreateMesh()` to help users create their own mesh,
+and also has functionality to compute a default mesh and priors.
+
+
+The arguments of `fnCreateMesh()` are `depoint` `boundaryregion`.
+`boundaryregion` is mandatory. It is the boundary of the estimated Gaussian random field. Our mesh will be created only within boundary. And the estimation and prediction will be done based on the created mesh, which will not exist over `boundaryregion`.  In other words, the input point/areal data and the target points or areas locations have to be within the `boundaryregion`. We are not allowed the estimation and the prediction locations outside the `boundaryregion`.
+
+`depoint` is not mandatory. IF the input point data is accessible, the locations of the points will be the used as initial triangulation nodes of our created mesh. But if only the `boundaryregion` is provided, the function will be able to generate a mesh as well.  
+
+The two parameters `priorspdesigma` and `priorspderange` are used to create a SPDE with Penalized Complexity priors (PC priors), which is proposed by Simpson et al.(2017). PC priors are defined by probability statements about the parameters $\sigma$ and $\rho$. $\sigma$ is the marginal standard deviation of the random field and $\rho$ is the spatial range of the field. If users want to set PC priors for their random fields, `priorspdesigma` and `priorspderange` are supposed to be input. Both two parameters are 2 length vectors. The first element of `priorspdesigma`is the value of the $\sigma$ and the second element is the probability of $\sigma$ **larger** than the first element. That is, 
+$$
+P(σ > σ_0)=p_σ
+$$
+
+Similarly, the first element for `priorspderange` is the value of the $\rho$ and the second element is the probability of $\sigma$ **less** than the first element.
+
+$$
+P(ρ < ρ_0)=p_ρ
+$$
+
+Thus, the two elements of `priorspdesigma` and `priorspderange`  are positive and the second elements (probabilities) are also less than 1.
+
+
+
+
+### Prediction using point data
+
+Then we call the function to predict. The predicted mean and predicted interval are obtained. 
+
+```{r}
+# Create mesh
+mesh <- fnCreateMesh(depoint, boundaryregion)
+plot(mesh)
+points(as.matrix(st_coordinates(depoint)[ , c(1, 2)]), col = 2)
+
+
+respre <- fnPredictMelding(depoint = depoint, dearea = NULL, dppoint = dppoint, dparea = NULL, boundaryregion = boundaryregion, mesh = NULL)
+
+head(respre)
+  
+ggplot(data = boundaryregion) + geom_sf() +
+  geom_sf(data = respre[[1]], aes(geometry = geometry, color = pred_mean))+
+  labs(title = "Average PM 2.5  Level 2016, UK", fill = "PM 2.5")
+ 
+```
+
+
+### Prediction using areal data
+
+
+```{r}
+mesh <- fnCreateMesh(NULL, boundaryregion)
+respre <- fnPredictMelding(depoint =  NULL, dearea = dearea, dppoint = NULL, dparea = dparea, boundaryregion = boundaryregion,  mesh = NULL)
+
+head(respre)
+
+ggplot(data = boundaryregion) + geom_sf() +
+   geom_sf(data = respre[[2]], aes(geometry = geometry, fill = pred_mean)) +
+   labs(title = "Average PM 2.5  Level 2016, UK", fill = "PM 2.5")
+```
+
+
+
+
+### Prediction using point and areal data
+
+
+```{r}
+mesh <- fnCreateMesh(depoint, boundaryregion)
+respre <- fnPredictMelding(depoint =  depoint, dearea = dearea, dppoint = dppoint, dparea = dparea, boundaryregion = boundaryregion,  mesh = NULL)
+
+head(respre)
+
+# point data
+ggplot(data = boundaryregion) + geom_sf() +
+  geom_sf(data = respre[[1]], aes(geometry = geometry, color = pred_mean))+
+  labs(title = "Average PM 2.5  Level 2016, UK", fill = "PM 2.5")
+ 
+# areal data
+ggplot(data = boundaryregion) + geom_sf() +
+   geom_sf(data = respre[[2]], aes(geometry = geometry, fill = pred_mean)) +
+   labs(title = "Average PM 2.5  Level 2016, UK", fill = "PM 2.5")
+```
+
+
+
+## Compare performance of the methods
+
+### Geostatistical Data Model vs. Medling Model
+
+```{r}
+#plot(1:74, geopre[[1]]$pvalue)
+#lines(1:74, geopre[[1]]$pred_mean, col = 2)
+#lines(1:74, meldpre[[1]]$pred_mean, col = 3)
+#legend('bottomright', c('Melding','Geo'),lty = 1, col = c(3,2) )
+```
