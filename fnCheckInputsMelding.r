@@ -40,12 +40,12 @@ fnCheckInputsMelding <- function(depoint, dearea, dppoint, dparea, boundaryregio
   if(!class(boundaryregion)[1] %in% c("sf", "NULL") ){
     stop("boundary should be null or 'sf' obj")
     }
-  if(is.null(dearea) == F && nrow(dparea) !=  nrow(st_join(dparea,boundaryregion))){
-    stop("predicted area should be within boundary")
+  if(is.null(dparea) == F){
+    if(nrow(dparea) !=  nrow(st_join(dparea,boundaryregion))) { stop("predicted area should be within boundary")}
     }
 
-  if(is.null(dppoint) == F && nrow(dppoint) !=  nrow(st_join(dppoint,boundaryregion))){
-    stop("predicted area should be within boundary")
+  if(is.null(dppoint) == F){
+    if(nrow(dppoint) !=  nrow(st_join(dppoint,boundaryregion))){stop("predicted area should be within boundary")}
   }
 }
 

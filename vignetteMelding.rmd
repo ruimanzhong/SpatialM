@@ -4,7 +4,7 @@ output: pdf_document
 ---
 
 ```{r include=FALSE}
-packages <- c('raster','rgdal', 'rnaturalearth', 'viridis','rnaturalearthhires',
+packages <- c( 'viridis','rnaturalearthhires',
               'sf','INLA','rgeoboundaries','tidyverse')
 
 package.check <- lapply(packages, FUN = function(x){
@@ -94,10 +94,7 @@ The areal data `dearea` is an `sf` object with columns XXXX
 ```{r warning=FALSE}
 # TODO. Put name column value not avalue
 
-dearea <- st_read("arealdata/dearea.shp")
-dearea$value <- dearea$avalue
-
-
+dearea <- st_read("areal_data/dearea.shp")
 ggplot(data = boundaryregion) + geom_sf() +
 geom_sf(data = dearea, aes(fill = value))
 
@@ -120,7 +117,7 @@ geom_sf(data = dearea, aes(fill = value))
 
 ### Point data for prediction
 
-Point data for prediction `dppoint` is an `sf` object with columns XXX.
+Point data for prediction `dppoint` is an `sf` object with columns `value`, `x`,`y`.
 
 In this example we use the same point data for prediction and estimation.
 
@@ -135,7 +132,7 @@ geom_sf(data = dppoint)
 ### Areal data for prediction
 
 
-Areal data for prediction `dparea` is an `sf` object with columns XXX.
+Areal data for prediction `dparea` is an `sf` object with columns `value` and `geometry`.
 
 In this example we use the same areal data for prediction and estimation.
 

@@ -38,7 +38,7 @@ if(is.null(mesh)){
 
 # Create spde and index
 if(!is.null(priorspdesigma) & !is.null(priorspderange)){
-  fnCheckprior(priorspdesigma, priorspderange)
+  fnCheckPrior(priorspdesigma, priorspderange)
   spde <- inla.spde2.pcmatern(mesh = mesh, prior.range = priorspderange, prior.sigma = priorspdesigma)
 }else {
   spde <- inla.spde2.matern(mesh = mesh, alpha = 2, constr = T)

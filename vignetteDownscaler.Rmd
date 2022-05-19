@@ -1,0 +1,118 @@
+---
+title: "vignetteDownscaler"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+packages <- c( 'viridis','rnaturalearthhires',
+              'sf','INLA','rgeoboundaries','tidyverse')
+
+package.check <- lapply(packages, FUN = function(x){
+  if(!require(x ,character.only = T)){install.packages(x)}
+  if(!(x %in% ( .packages()  ) ) ){library(x ,character.only = T)}
+  })
+
+theme_set(theme_minimal())
+options(ggplot2.continuous.colour="viridis")
+options(ggplot2.continuous.fill = "viridis")
+
+```
+
+```{r}
+source("fnCheckInputsDown.R")
+source("fnCreateMesh.R")
+source("fnPredictDown.R")
+```
+
+# Specifying the arguments of `fnPredictDown()`
+
+`fnPredictDown()` aims to predict spatial data when areal data and point data within the observed areal data available. The prediction is made by the following model:
+$$
+Y(s_i) = \beta_0(s_i) + \beta_1(s_i)X(s_i) + \epsilon_i
+$$
+where $Y(s_i)$ is the point data and $X(s_i)$ is the observed areal data that the point $Y(s_i)$ locates. 
+
+Thus, To use `fnPredictDown()`, the observed point (`depoint`) and areal data (`dearea`) are compulsory. They are `sf` objects. 
+
+Then, we need to specify the locations or areas where we want to get predictions. 
+Depending on where we want to predict,we would need to specify `sf` objects`dppoint` for a set of points and `dparea` for a set of areas.
+
+`dppoint` can be an `sf` object containing a few points or a dense set of regular points within the study region representing a continuous surface
+(`dpcontsurface`).
+
+We also need to specify an `sf` object the boundary of the region of study, `boundaryregion`.
+
+Note that all objects need to be `sf` objects and have the same projection.
+Therefore, if we have `raster` or `sp` data, we need to transform them to `sf` to be able to use the package.
+
+## Specifying the observed data
+
+
+Similar to the vignette of `fnPredictMelding()`, we will show how to predict PM 2.5 in UK. The projection method is 4326 or WSG84 (latitude and longitude).
+ 
+We obtain the boundary of the region of study with the `rgeoboundaries` package and transform it to the chosen projection. Then we construct `sf` objects from the observed point data and areal data. 
+Please read the previous vignette (Link), if you do not know how to construct `sf` objects and specify the estimated data.  
+
+The column names of `depoint` data have to be `pvalue`,`geometry`, where `pvalue` stands for the estimated value for point data and the other column includes spatial information.
+
+The column names of `dearea` data have to be `avalue`,`geometry`, where `avalue` stands for the estimated value for areal data and the other column includes spatial information.
+```{r}
+# CRS projection
+crsproj <- 4326
+
+library(rgeoboundaries)
+boundaryregion <- geoboundaries("United Kingdom")
+boundaryregion <- st_transform(boundaryregion , crsproj)[,6]
+
+
+# observed areal data
+dearea <- st_read("areal_data/dearea.shp")
+
+# observed point data
+depoint <- read.csv("pointdata.csv")
+depoint <- depoint[, c(2, 3, 4)]
+colnames(depoint) <- c('pvalue', 'y', 'x')
+
+depoint <- depoint %>% st_as_sf(coords = c("x", "y"), dim = "XY") %>%
+  st_set_crs(crsproj) %>% st_cast("MULTIPOINT")
+
+colnames(dearea) <- c('avalue', 'geometry')
+```
+
+## Specifying the point data and areal data for prediction
+
+Areal data for prediction `dparea` is an `sf` object with columns `value` and `geometry`.
+The estimated point position and area will be the predicted point and area. 
+
+```{r}
+dppoint <- depoint
+dparea <- dearea
+```
+
+If we wish to predict in a continuous surface, we need to provide a dense grid of points within the region of study. The method can be found (Link). 
+
+## Downscaler Method with `fnPredictDown()`
+
+```{r}
+# Create mesh
+mesh <- fnCreateMesh(depoint, boundaryregion)
+plot(mesh)
+points(as.matrix(st_coordinates(depoint)[ , c(1, 2)]), col = 2)
+
+
+respre <- fnPredictDown(depoint = depoint, dearea = dearea, dppoint = dppoint, dparea = dparea, boundaryregion = boundaryregion, mesh = mesh)
+
+head(respre)
+  
+ggplot(data = boundaryregion) + geom_sf() +
+  geom_sf(data = respre[[1]], aes(geometry = geometry, color = pred_mean))+
+  labs(title = "Average PM 2.5  Level 2016, UK", fill = "PM 2.5")
+
+ggplot(data = boundaryregion) + geom_sf() +
+  geom_sf(data = respre[[2]], aes(geometry = geometry, fill = pred_mean))+
+  labs(title = "Average PM 2.5  Level 2016, UK", fill = "PM 2.5")
+```
