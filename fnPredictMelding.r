@@ -29,7 +29,7 @@ dp1ToF <- !is.null(dp1)
 dp2ToF <- !is.null(dp2)
 
 
-
+# Mesh
 if(is.null(mesh)){
   mesh <- fnCreateMesh(de1, boundaryregion)
 }
@@ -40,7 +40,7 @@ if(is.null(mesh)){
 if(!is.null(priorspdesigma) & !is.null(priorspderange)){
   fnCheckPrior(priorspdesigma, priorspderange)
   spde <- inla.spde2.pcmatern(mesh = mesh, prior.range = priorspderange, prior.sigma = priorspdesigma)
-}else {
+}else{
   spde <- inla.spde2.matern(mesh = mesh, alpha = 2, constr = T)
 }
 indexs <- inla.spde.make.index("s", spde$n.spde)

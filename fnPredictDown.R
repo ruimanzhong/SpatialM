@@ -5,13 +5,25 @@
 
 source("fnCreateMesh.R")
 source("fnCheckInputsDown.R")
-fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, boundaryregion
-                          , mesh = NULL, priorspdesigma = NULL, priorspderange = NULL) {
+fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, boundaryregion,
+                          mesh = NULL, priorspdesigma = NULL, priorspderange = NULL){
+  
+  
+  # Use 1 for points and 2 for areas
+  # datasets estimation
   de1 <- depoint
   de2 <- dearea
   # datasets prediction
   dp1 <- dppoint
   dp2 <- dparea
+  
+  # Set avalue and pvalue instead of value
+  de1$pvalue <- de1$value
+  de2$avalue <- de2$value
+  dp1$pvalue <- dp1$value
+  dp2$avalue <- dp2$value  
+  
+  # Check inputs
   
   # check function
   # TO DO : check crs of input is crsproj
@@ -21,11 +33,8 @@ fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, bounda
   dp1ToF <- !is.null(dp1)
   dp2ToF <- !is.null(dp2)
   
-  # Match Areal data and point data, Match dppoint and dearea
-  locin <- st_join(de1, de2, left = F)
   
-  # Projection Matrix for point data and dppoint area
-  
+  # Mesh
   if (is.null(mesh) == T) {
     mesh <- fnCreateMesh(de1, boundaryregion)
   }
@@ -34,63 +43,87 @@ fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, bounda
   if(!is.null(priorspdesigma) & !is.null(priorspderange)){
     fnCheckPrior(priorspdesigma, priorspderange)
     spde <- inla.spde2.pcmatern(mesh = mesh, prior.range = priorspderange, prior.sigma = priorspdesigma)
-  }else {
+  }else{
     spde <- inla.spde2.matern(mesh = mesh, alpha = 2, constr = T)
   }
-  
-  # set formula
-  formula <- y ~ 0 + b0 + X + f(s, model = spde) + f(s1, model = spde)
   indexs <- inla.spde.make.index("s", spde$n.spde)
   indexs1 <- inla.spde.make.index("s1", spde$n.spde)
   
+  
+  
+  # Match Areal data and point data, Match dppoint and dearea
+  locin <- st_join(de1, de2, left = F)
+  
+  ### PAULA: Keep both points and areas are inside study region, areal data de2?
+  # If TRUE, predict in points
   if(dp1ToF){
-  locin_pred <- st_join(dp1,de2, left = FALSE)
+    locin_pred <- st_join(dp1, de2, left = FALSE)
   }
   
+  # If TRUE, predict in areas. Construct prediction surface
   if(dp2ToF){
-    # Construct Prediction Surface
+    # Bounding box
     bb <- unname(attributes(st_geometry(boundaryregion))$bbox)
-    
     # Grid
     x <- seq(bb[1] - 1, bb[3] + 1, length.out = 50)
     y <- seq(bb[2] - 1, bb[4] + 1, length.out = 50)
     coop <- expand.grid(x, y)
     coop_sf <- sf::st_as_sf(coop, coords = c('Var1','Var2'), crs = st_crs(de1))
+    # Keep points inside
     dpcontsurface <- coop_sf %>% st_join(boundaryregion, left = FALSE) %>% st_join(de2, left = FALSE)
   }
 
-  # construct stack
+
+  
+  # Create projection matrices A
+  # Matrix A estimation
   Ae <- inla.spde.make.A(mesh, loc = as.matrix(st_coordinates(locin[, 1]))[, c(1, 2)])
-  if(dp1ToF){Ap1 <- inla.spde.make.A(mesh = mesh, loc = as.matrix(st_coordinates(locin_pred )[ , c(1,2)]))}
+  # Matrix A points prediction
+  if(dp1ToF){Ap1 <- inla.spde.make.A(mesh = mesh, loc = as.matrix(st_coordinates(locin_pred)[, c(1,2)]))}
+  # Matrix A areas prediction (need to predict in a continuous surface first, dense points)
   if(dp2ToF){Ap2 <- inla.spde.make.A(mesh = mesh, loc = as.matrix(st_coordinates(dpcontsurface[, 1])))}
   
-  
-  stk.e <- inla.stack(tag = "est", data = list(y = locin$pvalue), A = list(1, Ae * locin$avalue, Ae), effects = list(data.frame(b0 = rep(1, nrow(locin)), X = locin$avalue), s = indexs$s, s1 = indexs1$s1))
-  
-  if(dp1ToF){stk.p1 <- inla.stack(tag = "pred1", data = list(y = NA), A = list(1, Ap1 * locin_pred$avalue, Ap1), effects = list(data.frame(b0 = rep(1, nrow(locin_pred)), X = locin_pred$avalue), s = indexs$s, s1 = indexs1$s1))}
-  if(dp2ToF){stk.p2 <- inla.stack(tag = "pred2", data = list(y = NA), A = list(1, Ap2 * dpcontsurface$avalue, Ap2), effects = list(data.frame(b0 = rep(1, nrow(dpcontsurface)), X = dpcontsurface$avalue), s = indexs$s, s1 = indexs1$s1))}
-  
+  # Create stk.full
+  # btilde0(x) = b0 + b0(x) (Ap1 + indexs1$s1)
+  # btilde1(x) = b1 + b1(x) (Ap1 * locin_pred$avalue + indexs$s)
+  # stack estimation
+  stk.e <- inla.stack(tag = "est", data = list(y = locin$pvalue),
+                      A = list(1, Ae * locin$avalue, Ae),
+                      effects = list(data.frame(b0 = rep(1, nrow(locin)), X = locin$avalue), s = indexs$s, s1 = indexs1$s1))
+  # stack prediction points
+  if(dp1ToF){stk.p1 <- inla.stack(tag = "pred1", data = list(y = NA),
+                                  A = list(1, Ap1 * locin_pred$avalue, Ap1),
+                                  effects = list(data.frame(b0 = rep(1, nrow(locin_pred)), X = locin_pred$avalue), s = indexs$s, s1 = indexs1$s1))}
+  # stack prediction areas
+  if(dp2ToF){stk.p2 <- inla.stack(tag = "pred2", data = list(y = NA),
+                                  A = list(1, Ap2 * dpcontsurface$avalue, Ap2),
+                                  effects = list(data.frame(b0 = rep(1, nrow(dpcontsurface)), X = dpcontsurface$avalue), s = indexs$s, s1 = indexs1$s1))}
+  # construct stack full with the data we have
   stk.full <-  do.call(inla.stack, list(stk.e, stk.p1, stk.p2)[c( T , dp1ToF, dp2ToF)])
   
-  # estimation and prediction
-  res <- inla(formula,
-              data = inla.stack.data(stk.full),
-              control.predictor = list(
-                compute = TRUE,
-                A = inla.stack.A(stk.full)
-              )
-  )
+  
+  # Specify formula downscaling
+  formula <- y ~ 0 + b0 + X + f(s, model = spde) + f(s1, model = spde)
+  
+
+  # Call inla()
+  res <- inla(formula, data = inla.stack.data(stk.full), control.predictor = list(compute = TRUE, A = inla.stack.A(stk.full)))
+  
   
   # Retrieve predictions points
   # Predictions points
   if(dp1ToF){dp1 <- fnRetrievePredictions_p(stk.full, res, "pred1", locin_pred)}
   # Predictions areas
-  if(dp2ToF){dp2 <- fnRetrievePredictions_a(stk.full, res, "pred2",dpcontsurface, dp2)}
+  if(dp2ToF){dp2 <- fnRetrievePredictions_a(stk.full, res, "pred2", dpcontsurface, dp2)}
   
   return(list(dp1,dp2))
 }
 
-# ----
+
+#####################################################################
+# INI AUXILIARY FUNCTIONS
+#####################################################################
+
 # Retrieve predictions
 fnRetrievePredictions_p <- function(stack, res, tag, dataset){
   index <- inla.stack.index(stack = stack, tag = tag)$data
@@ -120,3 +153,9 @@ fnCheckPrior <- function(prior.range, prior.sigma){
          prior probability of the deviation (0~1)")
   }
 }
+
+
+#####################################################################
+# END AUXILIARY FUNCTIONS
+#####################################################################
+

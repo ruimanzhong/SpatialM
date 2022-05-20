@@ -88,7 +88,7 @@ geom_sf(data = depoint, aes(col = value))
 
 ### Areal data for estimation
 
-The areal data `dearea` is an `sf` object with columns XXXX
+The areal data `dearea` is an `sf` object with columns `geometry` for the polygons and `value` for the value of the process in the polygons.
 
 
 ```{r warning=FALSE}
@@ -149,9 +149,7 @@ geom_sf(data = dparea)
 If we wish to predict in a continuous surface, we need to provide a dense grid of points within the region of study.
 We can do that by creating a bounding box of the region of study and using `expand.grid()` to create a grid of points within the boundary. 
 
-
-
-
+Specifically, we first create a grid of points withing the bounding box of the study region.
 
 ```{r}
 # Bounding box of the boundary of the region of study
@@ -165,7 +163,10 @@ coop_sf <- sf::st_as_sf(coop, coords = c('Var1','Var2'), crs = crsproj)
 
 ggplot()+geom_sf(data = coop_sf)
 ```
-The next step is to remove the point outside of the boundary. Thus, the leaf points are just our target points, which will be `dppoint` in `fnPredictMelding()`. 
+
+
+Then, we to remove the points that lie outside of the boundary of the study region. The points left are our target points, which will be `dppoint` in `fnPredictMelding()`. 
+
 ```{r}
 # Transform matrix data to sf objet
 dpcontsurface <- coop_sf %>% st_join(boundaryregion, left = FALSE)
