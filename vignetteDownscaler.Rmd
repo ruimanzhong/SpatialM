@@ -57,9 +57,9 @@ Similar to the vignette of `fnPredictMelding()`, we will show how to predict PM 
 We obtain the boundary of the region of study with the `rgeoboundaries` package and transform it to the chosen projection. Then we construct `sf` objects from the observed point data and areal data. 
 Please read the previous vignette (Link), if you do not know how to construct `sf` objects and specify the estimated data.  
 
-The column names of `depoint` data have to be `pvalue`,`geometry`, where `pvalue` stands for the estimated value for point data and the other column includes spatial information.
+The column names of `depoint` data have to be `value`,`geometry`, where `value` stands for the estimated value for point data and the other column includes spatial information.
 
-The column names of `dearea` data have to be `avalue`,`geometry`, where `avalue` stands for the estimated value for areal data and the other column includes spatial information.
+The column names of `dearea` data have to be `value`,`geometry`, where `value` stands for the estimated value for areal data and the other column includes spatial information.
 ```{r}
 # CRS projection
 crsproj <- 4326
@@ -75,12 +75,12 @@ dearea <- st_read("areal_data/dearea.shp")
 # observed point data
 depoint <- read.csv("pointdata.csv")
 depoint <- depoint[, c(2, 3, 4)]
-colnames(depoint) <- c('pvalue', 'y', 'x')
+colnames(depoint) <- c('value', 'y', 'x')
 
 depoint <- depoint %>% st_as_sf(coords = c("x", "y"), dim = "XY") %>%
   st_set_crs(crsproj) %>% st_cast("MULTIPOINT")
 
-colnames(dearea) <- c('avalue', 'geometry')
+colnames(dearea) <- c('value', 'geometry')
 ```
 
 ## Specifying the point data and areal data for prediction

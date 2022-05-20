@@ -34,8 +34,6 @@ if(is.null(mesh)){
   mesh <- fnCreateMesh(de1, boundaryregion)
 }
 
-
-
 # Create spde and index
 if(!is.null(priorspdesigma) & !is.null(priorspderange)){
   fnCheckPrior(priorspdesigma, priorspderange)

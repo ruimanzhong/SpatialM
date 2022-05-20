@@ -19,11 +19,11 @@ fnCheckInputsDown <- function(depoint, dearea, dppoint, dparea, boundaryregion) 
   }
   
   
-  if(sum(c("pvalue", "geometry") %in% colnames(depoint)) != 2 ){
-    stop("'depoint' must have 'pvalue','geometry' as column names")
+  if(sum(c("value", "geometry") %in% colnames(depoint)) != 2 ){
+    stop("'depoint' must have 'value','geometry' as column names")
   }
-  if(sum(c("avalue", "geometry") %in% colnames(dearea)) != 2 ){
-    stop("'dearea' must have 'avalue','geometry', as column names")
+  if(sum(c("value", "geometry") %in% colnames(dearea)) != 2 ){
+    stop("'dearea' must have 'value','geometry', as column names")
   }
   
   if(st_crs(depoint) != st_crs(dearea) && sum(c(is.null(depoint), is.null(dearea))) == 0){

@@ -54,7 +54,7 @@ fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, bounda
   # Match Areal data and point data, Match dppoint and dearea
   locin <- st_join(de1, de2, left = F)
   
-  ### PAULA: Keep both points and areas are inside study region, areal data de2?
+  ### PAULA: Keep both points and areas are inside study region. Should join by de2 or boundaryregion?
   # If TRUE, predict in points
   if(dp1ToF){
     locin_pred <- st_join(dp1, de2, left = FALSE)
@@ -116,7 +116,7 @@ fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, bounda
   # Predictions areas
   if(dp2ToF){dp2 <- fnRetrievePredictions_a(stk.full, res, "pred2", dpcontsurface, dp2)}
   
-  return(list(dp1,dp2))
+  return(list(dp1, dp2))
 }
 
 
@@ -139,10 +139,11 @@ fnRetrievePredictions_a <- function(stack, res, tag, dataset, dp){
   dataset$pred_mean <- res$summary.fitted.values[index, "mean"]
   dataset$pred_ll <- res$summary.fitted.values[index, "0.025quant"]
   dataset$pred_ul <- res$summary.fitted.values[index, "0.975quant"]
-  res = aggregate(dataset, dp[2], mean)
-  return(res)
+  agg <- aggregate(dataset, dp[2], mean) # PAULA: This should come from inla.posterior.sample
+  return(agg)
 }
-# Prior Check
+
+# Prior Check. PAULA: fnCheckPrior is the same as the funciton in fnPredictMelding(). Delete one of them
 fnCheckPrior <- function(prior.range, prior.sigma){
   if(length(prior.range) != 2 ||sum(prior.range >0) != 2 || prior.range[2] > 1){
     stop("The parameters of prior.sigma are not valid, the length 2 vector contains spatial range (>0) and 
