@@ -10,16 +10,13 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r include=FALSE}
 packages <- c( 'viridis','rnaturalearthhires',
               'sf','INLA','rgeoboundaries','tidyverse')
-
 package.check <- lapply(packages, FUN = function(x){
   if(!require(x ,character.only = T)){install.packages(x)}
   if(!(x %in% ( .packages()  ) ) ){library(x ,character.only = T)}
   })
-
 theme_set(theme_minimal())
 options(ggplot2.continuous.colour="viridis")
 options(ggplot2.continuous.fill = "viridis")
-
 ```
 
 ```{r}
@@ -63,23 +60,17 @@ The column names of `dearea` data have to be `value`,`geometry`, where `value` s
 ```{r}
 # CRS projection
 crsproj <- 4326
-
 library(rgeoboundaries)
 boundaryregion <- geoboundaries("United Kingdom")
 boundaryregion <- st_transform(boundaryregion , crsproj)[,6]
-
-
 # observed areal data
 dearea <- st_read("areal_data/dearea.shp")
-
 # observed point data
 depoint <- read.csv("pointdata.csv")
 depoint <- depoint[, c(2, 3, 4)]
 colnames(depoint) <- c('value', 'y', 'x')
-
 depoint <- depoint %>% st_as_sf(coords = c("x", "y"), dim = "XY") %>%
   st_set_crs(crsproj) %>% st_cast("MULTIPOINT")
-
 colnames(dearea) <- c('value', 'geometry')
 ```
 
@@ -97,22 +88,34 @@ If we wish to predict in a continuous surface, we need to provide a dense grid o
 
 ## Downscaler Method with `fnPredictDown()`
 
+We use downscaler method only when both areal data and point data available. In this case, the mesh is the same, gnereated by combination of the location of the estimated point data and the boundary of the region. The predicted objectives can be point data, areal data, or a continuous surface. 
+
+The following example shows how to predict both point data and areal data. Here the locations of the point data and the partition of the areal data is the same as the estimated objects. We are able to only predict point data or areal data by specifying the not required obj to be NULL.
+
 ```{r}
 # Create mesh
 mesh <- fnCreateMesh(depoint, boundaryregion)
 plot(mesh)
 points(as.matrix(st_coordinates(depoint)[ , c(1, 2)]), col = 2)
-
-
 respre <- fnPredictDown(depoint = depoint, dearea = dearea, dppoint = dppoint, dparea = dparea, boundaryregion = boundaryregion, mesh = mesh)
-
 head(respre)
   
 ggplot(data = boundaryregion) + geom_sf() +
   geom_sf(data = respre[[1]], aes(geometry = geometry, color = pred_mean))+
   labs(title = "Average PM 2.5  Level 2016, UK", fill = "PM 2.5")
-
 ggplot(data = boundaryregion) + geom_sf() +
   geom_sf(data = respre[[2]], aes(geometry = geometry, fill = pred_mean))+
   labs(title = "Average PM 2.5  Level 2016, UK", fill = "PM 2.5")
+```
+
+#### Predicting a continuous surface
+
+Similar to Bayesian Melding method, we can use Downscaler method to predict a continuous surface and use the plot function `plot_sp()`. Here, we use the same mesh that we create in last section. 
+
+```{r}
+respre_down <- fnPredictDown(depoint = depoint, dearea = dearea, dppoint = dpcontsurface, dparea = NULL, boundaryregion = boundaryregion, mesh = mesh)
+
+results = respre_down[[1]]
+
+plot_sp(results)
 ```
