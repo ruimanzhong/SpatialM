@@ -7,7 +7,7 @@
 # dearea dataset estimation area. SpatialPolygonsDataFrame. polygon, value
 # dppoint dataset prediction point
 # dparea dataset prediction area
-
+source('fnCheckInputsMelding.R')
 fnPredictMelding <- function(depoint = NULL, dearea = NULL, dppoint = NULL, dparea = NULL, boundaryregion,
                              mesh = NULL, priorspdesigma = NULL, priorspderange = NULL){
 

@@ -70,11 +70,13 @@ In our example, point data are in a `.csv` file. After reading the data frame, w
 
 
 ```{r warning=FALSE}
+setwd("~/Documents/Project 1/resources/sptialM/data")
 depoint <- read.csv("pointdata.csv")
 depoint <- depoint[, c(2, 3, 4)]
 colnames(depoint) <- c('value', 'y', 'x')
 depoint <- depoint %>% st_as_sf(coords = c("x", "y"), dim = "XY") %>%
-  st_set_crs(crsproj) %>% st_cast("MULTIPOINT")
+  st_set_crs(4326) %>% st_cast("MULTIPOINT")%>%
+  st_transform(crsproj)
 head(depoint)
 ggplot(data = boundaryregion) + geom_sf() +
 geom_sf(data = depoint, aes(col = value))
@@ -86,7 +88,8 @@ The areal data `dearea` is an `sf` object with columns `geometry` for the polygo
 
 
 ```{r warning=FALSE}
-dearea <- st_read("areal_data/dearea.shp")
+setwd("~/Documents/Project 1/resources/sptialM/data")
+dearea <- st_read("dearea.shp")%>% st_transform(crsproj)
 ggplot(data = boundaryregion) + geom_sf() +
 geom_sf(data = dearea, aes(fill = value))
 ```
@@ -241,9 +244,9 @@ In the previous session, we created a continuous surface called `dpcontsurface`.
 
 ```{r}
 mesh <- fnCreateMesh(depoint, boundaryregion)
-respre <- fnPredictMelding(depoint =  depoint, dearea = dearea, dppoint = dpcontsurface, dparea = NULL, boundaryregion = boundaryregion,  mesh = mesh)
+respre_meld <- fnPredictMelding(depoint =  depoint, dearea = dearea, dppoint = dpcontsurface, dparea = NULL, boundaryregion = boundaryregion,  mesh = mesh)
 
-results = respre[[1]]
+results = respre_meld[[1]]
 
 plot_sp(results)
 ```

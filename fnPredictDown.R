@@ -87,6 +87,9 @@ fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, bounda
   # btilde0(x) = b0 + b0(x) (Ap1 + indexs1$s1)
   # btilde1(x) = b1 + b1(x) (Ap1 * locin_pred$avalue + indexs$s)
   # stack estimation
+  stk.p1 <- NULL
+  stk.p2 <- NULL
+  
   stk.e <- inla.stack(tag = "est", data = list(y = locin$pvalue),
                       A = list(1, Ae * locin$avalue, Ae),
                       effects = list(data.frame(b0 = rep(1, nrow(locin)), X = locin$avalue), s = indexs$s, s1 = indexs1$s1))
