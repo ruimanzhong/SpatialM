@@ -5,21 +5,25 @@ output: pdf_document
 
 ```{r include=FALSE}
 packages <- c( 'viridis','rnaturalearthhires',
-              'sf','INLA','rgeoboundaries','tidyverse','rnaturalearth','raster', 'ggplot2')
+              'sf','INLA','rgeoboundaries','tidyverse','rnaturalearth','raster')
+
 package.check <- lapply(packages, FUN = function(x){
   if(!require(x ,character.only = T)){install.packages(x)}
   if(!(x %in% ( .packages()  ) ) ){library(x ,character.only = T)}
   })
+
 theme_set(theme_minimal())
 options(ggplot2.continuous.colour="viridis")
 options(ggplot2.continuous.fill = "viridis")
+
 ```
 
 ```{r}
+setwd("~/Documents/tasks from Geogroup")
 source("fnCheckInputsMelding.R")
 source("fnCreateMesh.R")
 source("fnPredictMelding.R")
-source("plot_sp.r")
+source('fnAggregating.r')
 ```
 
 # Specifying the arguments of `fnPredictMelding()`
@@ -43,7 +47,7 @@ Therefore, if we have `raster` or `sp` data, we need to transform them to `sf` t
 ## Specifying the boundary region
 
 
-In this example, we specify the projection as 2158 or UTM 29 zone.
+In this example, we specify the projection as 4326 or WSG84 (latitude and longitude).
  
 The region of study is UK. We obtain the boundary of the region of study with the `rgeoboundaries` package and transform it to the chosen projection. 
 
@@ -51,9 +55,11 @@ The region of study is UK. We obtain the boundary of the region of study with th
 ```{r}
 # CRS projection
 crsproj <- 2158
+
 library(rgeoboundaries)
 boundaryregion <- geoboundaries("United Kingdom")
 boundaryregion <- st_transform(boundaryregion , crsproj) 
+
 ggplot(boundaryregion) + geom_sf()
 ```
 
@@ -70,14 +76,17 @@ In our example, point data are in a `.csv` file. After reading the data frame, w
 
 
 ```{r warning=FALSE}
-setwd("~/Documents/Project 1/resources/sptialM/data")
+setwd("~/Documents/project /TBC/project 1/spatialM /areal_data")
 depoint <- read.csv("pointdata.csv")
 depoint <- depoint[, c(2, 3, 4)]
 colnames(depoint) <- c('value', 'y', 'x')
+
 depoint <- depoint %>% st_as_sf(coords = c("x", "y"), dim = "XY") %>%
   st_set_crs(4326) %>% st_cast("MULTIPOINT")%>%
   st_transform(crsproj)
+
 head(depoint)
+
 ggplot(data = boundaryregion) + geom_sf() +
 geom_sf(data = depoint, aes(col = value))
 ```
@@ -88,10 +97,26 @@ The areal data `dearea` is an `sf` object with columns `geometry` for the polygo
 
 
 ```{r warning=FALSE}
-setwd("~/Documents/Project 1/resources/sptialM/data")
-dearea <- st_read("dearea.shp")%>% st_transform(crsproj)
+# TODO. Put name column value not avalue
+setwd("~/Documents/project /TBC/project 1/spatialM ")
+dearea <- st_read("area_data_big/dearea.shp")%>%
+  st_transform(crsproj)
+
 ggplot(data = boundaryregion) + geom_sf() +
 geom_sf(data = dearea, aes(fill = value))
+
+
+# Create mask
+# TODO: create better mask. Now some cells are outside the border
+# br <- boundaryregion %>% st_geometry() %>% st_cast('POLYGON') %>% st_union()
+# brbbox <- br %>% st_bbox()
+# brbbox <- brbbox %>% st_as_sfc() %>% st_as_sf()
+# mask <- st_difference(brbbox, br)
+# 
+# ggplot(data = boundaryregion) + geom_sf() +
+# geom_sf(data = dearea, aes(fill = value)) +
+#   geom_sf(data = us_mask, fill = 'white')
+
 ```
 
 ## Specifying point, areal and continuous surface data for prediction
@@ -105,6 +130,8 @@ In this example we use the same point data for prediction and estimation.
 
 ```{r}
 dppoint <- depoint
+
+
 ggplot(data = boundaryregion) + geom_sf() +
 geom_sf(data = dppoint)
 ```
@@ -118,6 +145,8 @@ In this example we use the same areal data for prediction and estimation.
 
 ```{r}
 dparea <- dearea
+
+
 ggplot(data = boundaryregion) + geom_sf() +
 geom_sf(data = dparea)
 ```
@@ -132,11 +161,13 @@ Specifically, we first create a grid of points withing the bounding box of the s
 ```{r}
 # Bounding box of the boundary of the region of study
 bb <- unname(attributes(st_geometry(boundaryregion))$bbox)
+
 # Grid
-x <- seq(bb[1] - 1, bb[3] + 1, length.out = 50)
-y <- seq(bb[2] - 1, bb[4] + 1, length.out = 50)
+x <- seq(bb[1] - 1, bb[3] + 1, length.out = 500)
+y <- seq(bb[2] - 1, bb[4] + 1, length.out = 500)
 coop <- expand.grid(x, y)
 coop_sf <- sf::st_as_sf(coop, coords = c('Var1','Var2'), crs = crsproj)
+
 ggplot()+geom_sf(data = coop_sf)
 ```
 
@@ -148,6 +179,8 @@ Then, we to remove the points that lie outside of the boundary of the study regi
 dpcontsurface <- coop_sf %>% st_join(boundaryregion, left = FALSE)
   
 ggplot(dpcontsurface) + geom_sf()
+
+
 ggplot(data = boundaryregion) + geom_sf() +
 geom_sf(data = dpcontsurface)
 ```
@@ -196,7 +229,10 @@ Then we call the function to predict. The predicted mean and predicted interval 
 mesh <- fnCreateMesh(depoint, boundaryregion)
 plot(mesh)
 points(as.matrix(st_coordinates(depoint)[ , c(1, 2)]), col = 2)
+
+
 respre <- fnPredictMelding(depoint = depoint, dearea = NULL, dppoint = dppoint, dparea = NULL, boundaryregion = boundaryregion, mesh = NULL)
+
 head(respre)
   
 ggplot(data = boundaryregion) + geom_sf() +
@@ -212,7 +248,9 @@ ggplot(data = boundaryregion) + geom_sf() +
 ```{r}
 mesh <- fnCreateMesh(NULL, boundaryregion)
 respre <- fnPredictMelding(depoint =  NULL, dearea = dearea, dppoint = NULL, dparea = dparea, boundaryregion = boundaryregion,  mesh = NULL)
+
 head(respre)
+
 ggplot(data = boundaryregion) + geom_sf() +
    geom_sf(data = respre[[2]], aes(geometry = geometry, fill = pred_mean)) +
    labs(title = "Average PM 2.5  Level 2016, UK", fill = "PM 2.5")
@@ -225,8 +263,11 @@ ggplot(data = boundaryregion) + geom_sf() +
 
 
 ```{r}
-respre <- fnPredictMelding(depoint =  depoint, dearea = dearea, dppoint = dppoint, dparea = dparea, boundaryregion = boundaryregion,  mesh = NULL)
+mesh <- fnCreateMesh(depoint, boundaryregion)
+respre <- fnPredictMelding(depoint =  depoint, dearea = dearea, dppoint = dpcontsurface, dparea = NULL, boundaryregion = boundaryregion,  mesh = mesh)
+
 head(respre)
+
 # point data
 ggplot(data = boundaryregion) + geom_sf() +
   geom_sf(data = respre[[1]], aes(geometry = geometry, color = pred_mean))+
@@ -237,16 +278,102 @@ ggplot(data = boundaryregion) + geom_sf() +
    geom_sf(data = respre[[2]], aes(geometry = geometry, fill = pred_mean)) +
    labs(title = "Average PM 2.5  Level 2016, UK", fill = "PM 2.5")
 ```
+```{r}
+#results = st_transform(respre[[1]], crs(bd)) 
+results = respre[[1]]
+coop <- st_coordinates(results)
+pred_mean = results$pred_mean
+pred_ll = results$pred_ll
+pred_ul = results$pred_ul
 
-### Predicting a continuous surface
+dpm <- rbind(
+  data.frame(
+    X = coop[, 1], Y = coop[, 2],
+    PM2.5 = pred_mean, variable = "Mean"
+  ),
+  data.frame(
+    X = coop[, 1], Y = coop[, 2],
+    PM2.5 = pred_ll, variable = "2.5% "
+  ),
+  data.frame(
+    X = coop[, 1], Y = coop[, 2],
+    PM2.5 = pred_ul, variable = "97.5%"
+  )
+)
+dpm$variable <- as.factor(dpm$variable)
 
-In the previous session, we created a continuous surface called `dpcontsurface`. Now we will illustrate how to make prediction for a continuous surface. The `dpcontsurface` is a point predicted data, thus, we specify `dparea` to be NULL. The plot of predicted mean and its 95\% credible interval is generated by our function `plot_sp()`. 
+p = ggplot(dpm, aes(X,Y,color = PM2.5)) +
+  geom_tile(size = 1)+
+  facet_grid(~ variable)+
+  coord_fixed(ratio = 1)+
+  geom_sf(data = boundaryregion, inherit.aes = F, fill = NA)
+
+p
+```
 
 ```{r}
-mesh <- fnCreateMesh(depoint, boundaryregion)
-respre_meld <- fnPredictMelding(depoint =  depoint, dearea = dearea, dppoint = dpcontsurface, dparea = NULL, boundaryregion = boundaryregion,  mesh = mesh)
-
-results = respre_meld[[1]]
-
-plot_sp(results)
+setwd("~/Documents/project /TBC/project 1/results")
+png('melding.png',type = 'cairo', res = 300, width = 1600, height = 960)
+p + labs(
+  y = 'Longitude',
+  x = 'Latitude'
+)
+dev.off()
 ```
+
+## Aggregating 
+
+```{r}
+library(rnaturalearth)
+UK <- ne_states(country = "United Kingdom", returnclass = "sf")
+ad_boundaryregion <- st_transform(UK, crsproj)
+ad_boundaryregion$group <- as.factor(1:nrow(ad_boundaryregion))
+ad_boundaryregion<-ad_boundaryregion[, -c(1:83)]
+
+```
+
+### Construct Bayesian Model 
+```{r}
+res <- fnInla(depoint,dearea,dpcontsurface,NULL,boundaryregion,NULL,N = 100)
+```
+```{r}
+sample <- do.call(cbind.data.frame, res)
+colnames(sample) <- paste0('sample',1:ncol(sample))
+samples <- cbind(dpcontsurface,sample)[,-c(1:5)]
+dpsurface <- st_join(ad_boundaryregion,samples,left = T)
+
+dpsurface <- dpsurface %>%
+  group_by(group)%>%
+  summarise_if(.predicate = function(x) is.numeric(x),
+               .funs = funs(mean="mean"))
+```
+```{r}
+data <- as.data.frame(dpsurface %>% st_drop_geometry())
+
+pred_mean <- rowMeans(data[,-1])
+pred_limit <- apply(data[,-1],1,quantile, probs = c(0.025,0.975),na.rm = T)
+pred <- t(as.matrix(rbind(pred_mean,pred_limit)))
+pred<- cbind(pred,ad_boundaryregion)
+colnames(pred) <- c('pred_mean','pred_ll','pred_ul','group','geometry')
+```
+```{r}
+results <- st_transform(pred,2158)
+boundaryregion <- ad_boundaryregion
+p1 = ggplot(data = boundaryregion) + geom_sf() +
+geom_sf(data = results, aes(fill = pred_mean)) + 
+  theme_minimal() +
+  labs(title = "Mean", fill = "PM 2.5")
+p2 = ggplot(data = boundaryregion) + geom_sf() +
+geom_sf(data = results, aes(fill = pred_ll))+ 
+  theme_minimal() +
+  labs(title = "2.5%", fill = "PM 2.5")
+p3= ggplot(data = boundaryregion) + geom_sf() +
+geom_sf(data = results, aes(fill = pred_ul))+ 
+  theme_minimal() +
+  labs(title = "97.5%", fill = "PM 2.5")
+
+library(ggpubr)
+ggarrange( p2, p3,p1,  ncol = 3, nrow = 1)
+```
+
+

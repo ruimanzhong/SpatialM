@@ -3,7 +3,7 @@
 #' check they are sf objects
 #' check CRS points and areas are the same.
 fnCheckInputsMelding <- function(depoint, dearea, dppoint, dparea, boundaryregion) {
-
+  
   # Need to provide point and/or areal data for estimation
   if (is.null(dearea) == T && is.null(depoint) == T){
     stop("'Valid estimation data input required'")
@@ -31,7 +31,7 @@ fnCheckInputsMelding <- function(depoint, dearea, dppoint, dparea, boundaryregio
     stop('all the input data must have the same crs, use st_crs() to check your data')
   }
   if(is.null(dparea) == F  && sum(c(st_crs(dparea) == st_crs(depoint), st_crs(dparea) == st_crs(dearea))) == 0){
-     stop('all the input data must have the same crs, use st_crs() to check your data')
+    stop('all the input data must have the same crs, use st_crs() to check your data')
   }
   if(is.null(dppoint) == F && sum(c(st_crs(dppoint) == st_crs(depoint),st_crs(dppoint) == st_crs(dearea))) == 0){
     stop('all the input data must have the same crs, use st_crs() to check your data')
@@ -39,11 +39,11 @@ fnCheckInputsMelding <- function(depoint, dearea, dppoint, dparea, boundaryregio
   
   if(!class(boundaryregion)[1] %in% c("sf", "NULL") ){
     stop("boundary should be null or 'sf' obj")
-    }
+  }
   if(is.null(dparea) == F){
     if(nrow(dparea) !=  nrow(st_join(dparea,boundaryregion))) { stop("predicted area should be within boundary")}
-    }
-
+  }
+  
   if(is.null(dppoint) == F){
     if(nrow(dppoint) !=  nrow(st_join(dppoint,boundaryregion))){stop("predicted area should be within boundary")}
   }

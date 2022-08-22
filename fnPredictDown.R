@@ -3,8 +3,6 @@
 #' @param dearea A sf obj includes 'avalue' and 'geometry' columns, the areal data
 #' @return A dataframe with predicted mean, 95% credible interval of the prediction
 
-source("fnCreateMesh.R")
-source("fnCheckInputsDown.R")
 fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, boundaryregion,
                           mesh = NULL, priorspdesigma = NULL, priorspderange = NULL){
   
@@ -26,7 +24,6 @@ fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, bounda
   # Check inputs
   
   # check function
-  # TO DO : check crs of input is crsproj
   fnCheckInputsDown(de1, de2, dp1, dp2, boundaryregion)
   
   # Logical values indicating what datasets I have
@@ -54,7 +51,6 @@ fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, bounda
   # Match Areal data and point data, Match dppoint and dearea
   locin <- st_join(de1, de2, left = F)
   
-  ### PAULA: Keep both points and areas are inside study region. Should join by de2 or boundaryregion?
   # If TRUE, predict in points
   if(dp1ToF){
     locin_pred <- st_join(dp1, de2, left = FALSE)
@@ -72,8 +68,8 @@ fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, bounda
     # Keep points inside
     dpcontsurface <- coop_sf %>% st_join(boundaryregion, left = FALSE) %>% st_join(de2, left = FALSE)
   }
-
-
+  
+  
   
   # Create projection matrices A
   # Matrix A estimation
@@ -83,9 +79,6 @@ fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, bounda
   # Matrix A areas prediction (need to predict in a continuous surface first, dense points)
   if(dp2ToF){Ap2 <- inla.spde.make.A(mesh = mesh, loc = as.matrix(st_coordinates(dpcontsurface[, 1])))}
   
-  # Create stk.full
-  # btilde0(x) = b0 + b0(x) (Ap1 + indexs1$s1)
-  # btilde1(x) = b1 + b1(x) (Ap1 * locin_pred$avalue + indexs$s)
   # stack estimation
   stk.p1 <- NULL
   stk.p2 <- NULL
@@ -108,7 +101,7 @@ fnPredictDown <- function(depoint, dearea, dppoint = NULL, dparea = NULL, bounda
   # Specify formula downscaling
   formula <- y ~ 0 + b0 + X + f(s, model = spde) + f(s1, model = spde)
   
-
+  
   # Call inla()
   res <- inla(formula, data = inla.stack.data(stk.full), control.predictor = list(compute = TRUE, A = inla.stack.A(stk.full)))
   
@@ -145,21 +138,3 @@ fnRetrievePredictions_a <- function(stack, res, tag, dataset, dp){
   agg <- aggregate(dataset, dp[2], mean) # PAULA: This should come from inla.posterior.sample
   return(agg)
 }
-
-# Prior Check. PAULA: fnCheckPrior is the same as the funciton in fnPredictMelding(). Delete one of them
-fnCheckPrior <- function(prior.range, prior.sigma){
-  if(length(prior.range) != 2 ||sum(prior.range >0) != 2 || prior.range[2] > 1){
-    stop("The parameters of prior.sigma are not valid, the length 2 vector contains spatial range (>0) and 
-         prior probability of the deviation (0~1)")
-  }
-  if(length(prior.sigma) != 2 || sum(prior.sigma >0) != 2 || prior.sigma[2] > 1){
-    stop("The parameters of prior.sigma are not valid, the length 2 vector contains marginal standard deviation (>0) and 
-         prior probability of the deviation (0~1)")
-  }
-}
-
-
-#####################################################################
-# END AUXILIARY FUNCTIONS
-#####################################################################
-

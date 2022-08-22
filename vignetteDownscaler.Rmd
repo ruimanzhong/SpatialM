@@ -64,9 +64,9 @@ library(rgeoboundaries)
 boundaryregion <- geoboundaries("United Kingdom")
 boundaryregion <- st_transform(boundaryregion , crsproj)[,6]
 # observed areal data
-dearea <- st_read("areal_data/dearea.shp")
+dearea <- st_read("data/dearea.shp")
 # observed point data
-depoint <- read.csv("pointdata.csv")
+depoint <- read.csv("data/pointdata.csv")
 depoint <- depoint[, c(2, 3, 4)]
 colnames(depoint) <- c('value', 'y', 'x')
 depoint <- depoint %>% st_as_sf(coords = c("x", "y"), dim = "XY") %>%
