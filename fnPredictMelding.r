@@ -91,15 +91,12 @@ fnPredictMelding <- function(depoint = NULL, dearea = NULL, dppoint = NULL, dpar
 fnProjectionMatrixArea <- function(de2, mesh){
   
   meshcoo <- data.frame(X = mesh$loc[, 1], Y = mesh$loc[, 2])
-  
   meshin <- meshcoo %>% st_as_sf(coords = c("X", "Y"), dim = "XY") %>%
     st_set_crs(crs(de2)) %>% st_cast("MULTIPOINT")
   
   # find points in mesh n area.sf
   locin <- st_join(meshin, de2, left = F)
-  
   block <- rep(0, nrow(locin))
-  
   for(i in 1:nrow(de2)) {
     block[as.vector(which(!is.na(st_join(locin, de2[i,], left = T)$value.y)))] <- i
   }
